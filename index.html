@@ -1,18 +1,21 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-TW">
   <head>
-    <title>Roboflow x Webcam 音樂生成</title>
     <meta charset="utf-8" />
+    <title>Roboflow x Webcam 音樂生成</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
-      body { font-family: Arial; text-align: center; padding-top: 50px; }
-      video { width: 320px; height: 240px; border: 1px solid #ccc; margin-top: 10px; }
+      body { font-family: Arial, sans-serif; text-align: center; padding-top: 40px; }
+      video { width: 320px; height: 240px; border: 1px solid #ccc; margin: 10px 0; }
+      #status { font-weight: bold; margin-top: 10px; color: #333; }
     </style>
   </head>
   <body>
     <h1>🎹 Roboflow x Webcam 音樂生成</h1>
-    <video id="video" autoplay playsinline></video><br />
-    <button id="startBtn">開始辨識與產生音樂</button>
+    <p>點擊下方按鈕開始辨識與產生音樂！</p>
+    <video id="video" autoplay playsinline></video>
+    <div id="status">🔄 準備中...</div>
+    <button id="startBtn">開始辨識與演奏</button>
 
     <script>
       const API_KEY = "rf_nlqrAIurThQGf734WeZgq6PRiuy1";
@@ -24,26 +27,38 @@
         "4": "G4", "5": "A4", "6": "B4", "7": "C5",
         "8": "D5", "9": "E5"
       };
-
       const video = document.getElementById("video");
+      const statusDiv = document.getElementById("status");
       let recognitions = [];
 
       document.getElementById("startBtn").addEventListener("click", async () => {
+        updateStatus("📸 啟動攝影機中...");
         recognitions = [];
         await Tone.start();
         try {
           await startCamera();
+          updateStatus("🔍 開始進行辨識...");
           for (let i = 0; i < COUNT; i++) {
+            updateStatus(`⏱️ 第 ${i+1} 次辨識中...`);
             await new Promise(r => setTimeout(r, INTERVAL));
             const imgBlob = await captureImage();
             const result = await classifyImage(imgBlob);
-            if (result) recognitions.push(result);
+            if (result) {
+              recognitions.push(result);
+              updateStatus(`✅ 第 ${i+1} 次辨識完成：${result}`);
+            } else {
+              updateStatus(`⚠️ 第 ${i+1} 次辨識失敗`);
+            }
           }
           playMusic(recognitions);
         } catch (err) {
-          alert("錯誤：" + err.message);
+          updateStatus("❌ 發生錯誤：" + err.message);
         }
       });
+
+      function updateStatus(msg) {
+        statusDiv.textContent = msg;
+      }
 
       async function startCamera() {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -70,10 +85,7 @@
         const url = `https://detect.roboflow.com/${MODEL_ID}?api_key=${API_KEY}`;
         const response = await fetch(url, { method: "POST", body: formData });
         const data = await response.json();
-        if (data.predictions && data.predictions.length > 0) {
-          return data.predictions[0].class;
-        }
-        return null;
+        return data.predictions && data.predictions.length > 0 ? data.predictions[0].class : null;
       }
 
       function playMusic(digits) {
@@ -83,7 +95,7 @@
           const note = notesMap[digit] || "C4";
           synth.triggerAttackRelease(note, "8n", now + i * 0.5);
         });
-        alert("辨識結果：" + digits.join(", ") + " → 已轉換為音樂！");
+        updateStatus("🎶 已播放音樂（" + digits.join(", ") + "）");
       }
     </script>
   </body>
